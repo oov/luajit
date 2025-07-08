@@ -1,0 +1,62 @@
+name: releaser
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Get the version
+        id: get_version
+        run: echo "tag=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: setup
+        run: |
+          sudo apt install -y curl tar xz-utils make
+      - name: Build
+        run: |
+          mkdir -p build/tools
+          cd build/tools
+
+          curl -OL https://github.com/mstorsjo/llvm-mingw/releases/download/20250613/llvm-mingw-20250613-ucrt-ubuntu-22.04-x86_64.tar.xz
+          tar xf $(ls -1 | grep ^llvm-mingw-.*\.tar\.xz) && mv $(ls -1d */ | grep ^llvm-mingw- | sed 's/\///') llvm-mingw
+          export PATH=$PWD/llvm-mingw/bin:$PATH
+
+          cd ../../luajit
+
+          for arch in x86_64; do
+            cp $(which ${arch}-w64-mingw32-strip) $(which ${arch}-w64-mingw32-strip | sed 's/[^/]\+$/strip/')
+            HOST_CC="clang"
+            make HOST_CC="$HOST_CC" CROSS=${arch}-w64-mingw32- TARGET_SYS=Windows clean
+            make HOST_CC="$HOST_CC" CROSS=${arch}-w64-mingw32- TARGET_SYS=Windows amalg
+            mkdir -p ../build/${arch}/bin ../build/${arch}/lib ../build/${arch}/include
+            cp src/luajit.exe ../build/${arch}/bin/
+            cp src/lua51.dll ../build/${arch}/bin/
+            cp src/lua51.dll ../build/${arch}/lib/
+            cp src/lua.h src/lualib.h src/lauxlib.h src/luaconf.h src/luajit.h ../build/${arch}/include/
+            cp COPYRIGHT ../build/${arch}/
+            rm $(which ${arch}-w64-mingw32-strip | sed 's/[^/]\+$/strip/')
+          done
+      - name: Zip
+        run: |
+          mkdir -p release
+          for arch in x86_64; do
+            cd build/${arch} && zip -r ../../release/luajit_${{ steps.get_version.outputs.tag }}_${arch}.zip * && cd ../..
+          done
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.tag }}
+          draft: false
+          prerelease: false
+          files: release/*
+          body: |
+            - [luajit_${{ steps.get_version.outputs.tag }}_x86_64.zip](https://github.com/oov/luajit/releases/download/${{ steps.get_version.outputs.tag }}/luajit_${{ steps.get_version.outputs.tag }}_x86_64.zip)
