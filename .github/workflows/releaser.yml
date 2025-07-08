@@ -34,12 +34,13 @@ jobs:
           for arch in x86_64; do
             cp $(which ${arch}-w64-mingw32-strip) $(which ${arch}-w64-mingw32-strip | sed 's/[^/]\+$/strip/')
             HOST_CC="clang"
-            make HOST_CC="$HOST_CC" CROSS=${arch}-w64-mingw32- TARGET_SYS=Windows clean
-            make HOST_CC="$HOST_CC" CROSS=${arch}-w64-mingw32- TARGET_SYS=Windows amalg
+            TARGET_DLLNAME="lua51.dll"
+            make HOST_CC="$HOST_CC" CROSS=${arch}-w64-mingw32- TARGET_SYS=Windows TARGET_DLLNAME=${TARGET_DLLNAME} clean
+            make HOST_CC="$HOST_CC" CROSS=${arch}-w64-mingw32- TARGET_SYS=Windows TARGET_DLLNAME=${TARGET_DLLNAME} amalg
             mkdir -p ../build/${arch}/bin ../build/${arch}/lib ../build/${arch}/include
             cp src/luajit.exe ../build/${arch}/bin/
-            cp src/lua51.dll ../build/${arch}/bin/
-            cp src/lua51.dll ../build/${arch}/lib/
+            cp src/${TARGET_DLLNAME} ../build/${arch}/bin/
+            cp src/${TARGET_DLLNAME} ../build/${arch}/lib/
             cp src/lua.h src/lualib.h src/lauxlib.h src/luaconf.h src/luajit.h ../build/${arch}/include/
             cp COPYRIGHT ../build/${arch}/
             rm $(which ${arch}-w64-mingw32-strip | sed 's/[^/]\+$/strip/')
